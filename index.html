@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FocusGrowth & Time Auditor Dashboard</title>
+    <!-- Include Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-color: #f0f4f8;
+            --card-bg: #ffffff;
+            --primary: #4a90e2;
+            --text: #2c3e50;
+            --border: #e2e8f0;
+            
+            /* Category Colors */
+            --color-studying: #ffeaa7;       /* Yellow */
+            --color-timewaste: #ff7675;      /* Red */
+            --color-eating: #55efc4;         /* Green */
+            --color-resting: #fab1a0;        /* Orange */
+            --color-untracked: #dfe6e9;      /* Grey */
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .dashboard {
+            width: 100%;
+            max-width: 1000px;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+        }
+
+        @media(min-width: 768px) {
+            .dashboard {
+                grid-template-columns: 1fr 1fr;
+            }
+            .full-width {
+                grid-column: span 2;
+            }
+        }
+
+        .card {
+            background: var(--card-bg);
+            padding: 2rem;
+            border-radius: 16px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
+        }
+
+        h1, h2, h3 { margin-top: 0; color: #2c3e50; }
+
+        .streak-badge {
+            background: #ffeaa7;
+            color: #d63031;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            display: inline-block;
+            font-weight: bold;
+            font-size: 1.1rem;
+            margin-bottom: 1.5rem;
+            align-self: flex-start;
+        }
+
+        /* Time Block Spreadsheet Layout */
+        .sheet-container {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        .sheet-table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        .sheet-table th, .sheet-table td {
+            padding: 10px;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.95rem;
+        }
+
+        .sheet-table th {
+            background-color: #f8fafc;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        select {
+            width: 100%;
+            padding: 6px;
+            border-radius: 4px;
+            border: 1px solid var(--border);
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        /* Dropdown Color States */
+        select.studying { background-color: var(--color-studying); color: #856404; }
+        select.timewaste { background-color: var(--color-timewaste); color: #fff; }
+        select.eating { background-color: var(--color-eating); color: #0f5132; }
+        select.resting { background-color: var(--color-resting); color: #854000; }
+        select.untracked { background-color: var(--color-untracked); color: #636e72; }
+
+        .btn-submit {
+            padding: 0.8rem 1.8rem;
+            font-size: 1rem;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            background-color: var(--primary);
+            color: white;
+            transition: background 0.2s;
+            width: 100%;
+        }
+
+        .btn-submit:hover { background-color: #357abd; }
+
+        .toggle-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .btn-toggle {
+            background-color: #e2e8f0;
+            border: none;
+            padding: 0.5rem 1rem;
+            font-size: 0.9rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .btn-toggle.active {
+            background-color: var(--primary);
+            color: white;
+        }
+
+        .chart-container {
+            position: relative;
+            width: 100%;
+            height: 280px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="dashboard">
+    
+    <!-- Left Column: Hourly Sheet Log -->
+    <div class="card">
+        <h2>🗓️ End-of-Day Hourly Audit</h2>
+        <p style="margin-top:-10px; color:#7f8c8d; font-size:0.9rem;">Categorize what you did during each hour block below:</p>
+        
+        <div class="sheet-container">
+            <table class="sheet-table">
+                <thead>
+                    <tr>
+                        <th style="width: 40%;">Time Block</th>
+                        <th style="width: 60%;">Activity Category</th>
+                    </tr>
+                </thead>
+                <tbody id="sheet-body">
+                    <!-- JavaScript populates 24 rows here -->
+                </tbody>
+            </table>
+        </div>
+        <button class="btn-submit" onclick="saveDayLog()">Save Log & Update Dashboard</button>
+    </div>
+
+    <!-- Right Column: Quick Stats & Pie Summary -->
+    <div class="card">
+        <h2>🔥 Quick Status</h2>
+        <div class="streak-badge" id="streak-display">🔥 0 Day Streak</div>
+        
+        <div style="margin-top: 10px; border-top: 1px solid var(--border); padding-top: 15px;">
+            <h3 style="margin-bottom: 5px;">📊 Today's Time Breakdown</h3>
+            <div class="chart-container">
+                <canvas id="pieChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Row: Historical Growth Line Graphs (Full Width) -->
+    <div class="card full-width">
+        <h2>📈 Long-Term Study Growth</h2>
+        <div class="toggle-container">
+            <button class="btn-toggle active" id="btn-week" onclick="switchView('weekly')">Weekly View</button>
+            <button class="btn-toggle" id="btn-month" onclick="switchView('monthly')">Monthly View</button>
+        </div>
+        <div class="chart-container">
+            <canvas id="growthChart"></canvas>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    // Storage keys: 
+    // studyLogs = { "YYYY-MM-DD": studyHoursTotal }
+    // detailedDays = { "YYYY-MM-DD": [ "studying", "timewaste", ...24 items ] }
+    let studyLogs = JSON.parse(localStorage.getItem('studyLogs')) || {};
+    let detailedDays = JSON.parse(localStorage.getItem('detailedDays')) || {};
+    let streak = parseInt(localStorage.getItem('studyStreak')) || 0;
+    let lastLoggedDate = localStorage.getItem('lastLoggedDate') || "";
+    
+    let currentView = 'weekly';
+    let growthChart;
+    let pieChart;
+
+    const categories = [
+        { id: 'untracked', label: '🔘 Untracked / Sleep', color: '#dfe6e9' },
+        { id: 'studying', label: '🟡 Studying', color: '#ffeaa7' },
+        { id: 'timewaste', label: '🔴 Timewaste', color: '#ff7675' },
+        { id: 'eating', label: '🟢 Eating', color: '#55efc4' },
+        { id: 'resting', label: '🟠 Resting / Freshing up', color: '#fab1a0' }
+    ];
+
+    // Initialize App
+    buildHourlySheet();
+    checkStreakValidity();
+    updateStreakDisplay();
+    renderCharts();
+
+    function getTodayDateString() {
+        return new Date().toISOString().split('T')[0];
+    }
+
+    // Build the spreadsheet layout dynamically
+    function buildHourlySheet() {
+        const tbody = document.getElementById('sheet-body');
+        const today = getTodayDateString();
+        // Load today's saved blueprint or default to 'untracked' for all 24 slots
+        const savedDayData = detailedDays[today] || Array(24).fill('untracked');
+
+        tbody.innerHTML = '';
+
+        for (let hour = 0; hour < 24; hour++) {
+            const label12Hr = format12Hour(hour);
+            const tr = document.createElement('tr');
+            
+            // Time Column
+            const tdTime = document.createElement('td');
+            tdTime.innerHTML = `<strong>${label12Hr}</strong>`;
+            
+            // Selector Dropdown Column
+            const tdSelect = document.createElement('td');
+            const select = document.createElement('select');
+            select.id = `hour-${hour}`;
+            select.className = savedDayData[hour];
+            
+            categories.forEach(cat => {
+                const opt = document.createElement('option');
+                opt.value = cat.id;
+                opt.textContent = cat.label;
+                if (cat.id === savedDayData[hour]) opt.selected = true;
+                select.appendChild(opt);
+            });
+
+            // Change background tint live when dropdown item switches
+            select.addEventListener('change', (e) => {
+                select.className = e.target.value;
+            });
+
+            tdSelect.appendChild(select);
+            tr.appendChild(tdTime);
+            tr.appendChild(tdSelect);
+            tbody.appendChild(tr);
+        }
+    }
+
+    function format12Hour(hour) {
+        if (hour === 0) return '12:00 AM - 01:00 AM';
+        if (hour === 12) return '12:00 PM - 01:00 PM';
+        return hour > 12 
+            ? `${hour - 12}:00 PM - ${hour - 11}:00 PM` 
+            : `${hour}:00 AM - ${hour + 1}:00 AM`;
+    }
+
+    function saveDayLog() {
+        const today = getTodayDateString();
+        const hourlyArray = [];
+        let calculatedStudyHours = 0;
+
+        for (let h = 0; h < 24; h++) {
+            const val = document.getElementById(`hour-${h}`).value;
+            hourlyArray.push(val);
+            if (val === 'studying') calculatedStudyHours++;
+        }
+
+        // Save detailed structure and aggregate math
+        detailedDays[today] = hourlyArray;
+        studyLogs[today] = calculatedStudyHours;
+
+        localStorage.setItem('detailedDays', JSON.stringify(detailedDays));
+        localStorage.setItem('studyLogs', JSON.stringify(studyLogs));
+
+        // Maintain Streaks based on hourly calculation
+        if (lastLoggedDate !== today && calculatedStudyHours > 0) {
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+            const yesterdayString = yesterday.toISOString().split('T')[0];
+
+            if (lastLoggedDate === yesterdayString || streak === 0) {
+                streak++;
+            }
+            lastLoggedDate = today;
+            localStorage.setItem('studyStreak', streak);
+            localStorage.setItem('lastLoggedDate', lastLoggedDate);
+        }
+
+        updateStreakDisplay();
+        renderCharts();
+        alert(`Day Saved! Total Study Recorded Today: ${calculatedStudyHours} Hours.`);
+    }
+
+    function checkStreakValidity() {
+        const today = getTodayDateString();
+        if (lastLoggedDate && lastLoggedDate !== today) {
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+            const yesterdayString = yesterday.toISOString().split('T')[0];
+            
+            if (lastLoggedDate !== yesterdayString) {
+                streak = 0;
+                localStorage.setItem('studyStreak', streak);
+            }
+        }
+    }
+
+    function updateStreakDisplay() {
+        document.getElementById('streak-display').textContent = `🔥 ${streak} Day Streak`;
+    }
+
+    function switchView(view) {
+        currentView = view;
+        document.getElementById('btn-week').classList.toggle('active', view === 'weekly');
+        document.getElementById('btn-month').classList.toggle('active', view === 'monthly');
+        renderLineChart();
+    }
+
+    function renderCharts() {
+        renderPieChart();
+        renderLineChart();
+    }
+
+    function renderPieChart() {
+        const today = getTodayDateString();
+        const savedDayData = detailedDays[today] || Array(24).fill('untracked');
+        
+        // Count frequencies of each metric
+        const counts = { studying: 0, timewaste: 0, eating: 0, resting: 0, untracked: 0 };
+        savedDayData.forEach(item => counts[item]++);
+
+        const ctx = document.getElementById('pieChart').getContext('2d');
+        if (pieChart) pieChart.destroy();
+
+        pieChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Studying (Hrs)', 'Timewaste (Hrs)', 'Eating (Hrs)', 'Resting/Freshing (Hrs)', 'Sleep/Untracked (Hrs)'],
+                datasets: [{
+                    data: [counts.studying, counts.timewaste, counts.eating, counts.resting, counts.untracked],
+                    backgroundColor: ['#ffeaa7', '#ff7675', '#55efc4', '#fab1a0', '#dfe6e9'],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'right' } }
+            }
+        });
+    }
+
+    function renderLineChart() {
+        let labels = [];
+        let data = [];
+        const limit = currentView === 'weekly' ? 7 : 30;
+
+        for (let i = limit - 1; i >= 0; i--) {
+            let d = new Date();
+            d.setDate(d.getDate() - i);
+            let dateStr = d.toISOString().split('T')[0];
+            
+            labels.push(d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }));
+            data.push(studyLogs[dateStr] || 0);
+        }
+
+        const ctx = document.getElementById('growthChart').getContext('2d');
+        if (growthChart) growthChart.destroy();
+
+        growthChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Hours Studied',
+                    data: data,
+                    backgroundColor: 'rgba(74, 144, 226, 0.1)',
+                    borderColor: 'rgba(74, 144, 226, 1)',
+                    borderWidth: 3,
+                    tension: 0.2,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: { y: { beginAtZero: true, max: 24, title: { display: true, text: 'Hours' } } }
+            }
+        });
+    }
+</script>
+
+</body>
+</html>

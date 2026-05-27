@@ -229,7 +229,8 @@
         { id: 'studying', label: '🟡 Studying', color: '#ffeaa7' },
         { id: 'timewaste', label: '🔴 Timewaste', color: '#ff7675' },
         { id: 'eating', label: '🟢 Eating', color: '#55efc4' },
-        { id: 'resting', label: '🟠 Resting / Freshing up', color: '#fab1a0' }
+        { id: 'resting/workout', label: '🟠 Resting / Freshing up', color: '#fab1a0' }
+        { id: 'class/assignment', label: ' Resting / Freshing up', color: '#ffeaa9' }
     ];
 
     // Initialize App
@@ -374,10 +375,10 @@
         pieChart = new Chart(ctx, {
             type: 'doughnut',
             data: {
-                labels: ['Studying (Hrs)', 'Timewaste (Hrs)', 'Eating (Hrs)', 'Resting/Freshing (Hrs)', 'Sleep/Untracked (Hrs)'],
+                labels: ['Studying (Hrs)', 'Timewaste (Hrs)', 'Eating (Hrs)', 'Resting/Freshing (Hrs)', 'Sleep/Untracked (Hrs)','class/assignment (Hrs)'],
                 datasets: [{
                     data: [counts.studying, counts.timewaste, counts.eating, counts.resting, counts.untracked],
-                    backgroundColor: ['#ffeaa7', '#ff7675', '#55efc4', '#fab1a0', '#dfe6e9'],
+                    backgroundColor: ['#ffeaa7', '#ff7675', '#55efc4', '#fab1a0', '#dfe6e9','#ffeaa9'],
                     borderWidth: 1
                 }]
             },
